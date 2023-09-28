@@ -1,0 +1,29 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="GameSystem.cpp" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="BaseScene.cpp">
+      <Filter>Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="MainScene.cpp">
+      <Filter>Scene</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Component.hpp" />
+    <ClInclude Include="GameSystem.hpp" />
+    <ClInclude Include="BaseScene.hpp">
+      <Filter>Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="MainScene.hpp">
+      <Filter>Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Config.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Scene">
+      <UniqueIdentifier>{97ee953e-c65d-4c8d-93e6-14c5b8d873df}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
