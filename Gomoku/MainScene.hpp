@@ -2,6 +2,8 @@
 #include "BaseScene.hpp"
 #include <iostream>
 #include "Config.hpp"
+#include "KDTree.hpp"
+#include "Gomoku.hpp"
 
 class MainScene : public BaseScene
 {
@@ -9,23 +11,22 @@ private:
 	sf::VertexArray m_rectangle{ sf::PrimitiveType::Quads, 4 };
 	sf::VertexArray m_circle;
 	sf::Texture m_floorTexture;
-	//sf::Sprite m_floorSprite;
-	float xOffset{ 270 }, yOffset{ 20 };
-	float xIncrement{ 45 }, yIncrement{ 45 };
-	sf::FloatRect m_boardRect{270, 20, 670, 670};
+	//
+	using Point = typename std::array<int, 2>;
+	using PointPair = typename std::pair<Point, Point>;
+	KDTree<2, Point, int> m_tree;
+	//
+	Gomoku m_game;
+	// 
+	int xOffset{ 270 }, yOffset{ 20 };
+	int xIncrement{ 45 }, yIncrement{ 45 };
+	sf::IntRect m_boardRect{270, 20, 670, 670};
 public:
 	MainScene(sf::RenderWindow& window)
-		: BaseScene(window) 
+		: BaseScene(window)
 	{	
-		loadAndInitAssets();
-	
-		for (uint32_t i = 0; i < 15; ++i) {
-			for (uint32_t j = 0; j < 15; ++j) {
-				auto entity = m_registry.create();
-				m_registry.emplace<CBackgroundRenderable>(entity, xOffset + i * xIncrement, yOffset + j * yIncrement, m_rectangle, &m_floorTexture);
-			}
-		}
-
+		loadAndInit();
+		reset();
 	}
 
 	void render() override {
@@ -36,9 +37,6 @@ public:
 		m_registry.view<CRenderable>().each([this](const CRenderable& cRenderable) {
 			m_window.draw(cRenderable.vertexArray, cRenderable.state);
 			});
-		
-
-		
 	}
 
 	void update() override {}
@@ -46,16 +44,23 @@ public:
 	bool handleInput(sf::Event event) override {
 		if (event.type == sf::Event::MouseButtonPressed){
 			auto buttonPos = event.mouseButton;
-			if (m_boardRect.contains({static_cast<float>(buttonPos.x), static_cast<float>(buttonPos.y)})) {
+			if (m_boardRect.contains({ buttonPos.x, buttonPos.y })) {
 				std::cout << buttonPos.x << " " << buttonPos.y << "\n";
+				auto found = m_tree.findNearestNeighbor({ buttonPos.x, buttonPos.y });
+				auto [x, y] = found.first;
+				std::cout << found.second[0] << " " << found.second[1] << "\n";
+				auto put = m_game.putPiece(found.second[0] + found.second[1]* 14);
+				std::cout << "put: " << put << " is Over: " << m_game.isOver(found.second[0] + found.second[1] * 14) << "\n";
 				auto entity = m_registry.create();
-				m_registry.emplace<CRenderable>(entity, buttonPos.x, buttonPos.y, m_circle);
+				m_registry.emplace<CRenderable>(entity, x, y, m_circle);
 			}
+			return true;
 		}
-		return true;
+		
+		return false;
 	}
 private:
-	void loadAndInitAssets() {
+	void loadAndInit() {
 		if (!m_floorTexture.loadFromFile("resources/dark_wood_diff_2k.jpg"))
 			exit(-1);
 		m_floorTexture.setSmooth(true);
@@ -69,9 +74,28 @@ private:
 		m_rectangle[1].texCoords = { 2048, 0 };
 		m_rectangle[2].texCoords = { 2048, 2048 };
 		m_rectangle[3].texCoords = { 0, 2048 };
-
 		m_circle = makeCircle(20, 30);
+
+		for (int i = 0; i < 15; ++i) {
+			for (int j = 0; j < 15; ++j) {
+				auto entity = m_registry.create();
+				m_registry.emplace<CBackgroundRenderable>(entity, xOffset + i * xIncrement, yOffset + j * yIncrement, m_rectangle, &m_floorTexture);
+			}
+		}
+		std::vector<PointPair> treeData;
+		treeData.reserve(196); // 14*14
+		for (int i = 1; i <= 14; ++i) {
+			for (int j = 1; j <= 14; ++j) {
+				treeData.push_back(std::make_pair(Point({ xOffset + i * xIncrement, yOffset + j * yIncrement }), Point({ i - 1, j - 1 })));
+			}
+		}
+		m_tree.buildTree(treeData);
 	}
+
+	void reset() {
+		m_game.reset();
+	}
+
 
 	void setColor(sf::VertexArray& arr, sf::Color color) {
 		auto count = arr.getVertexCount();

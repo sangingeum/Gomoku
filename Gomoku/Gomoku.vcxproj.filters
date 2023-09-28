@@ -9,6 +9,7 @@
     <ClCompile Include="MainScene.cpp">
       <Filter>Scene</Filter>
     </ClCompile>
+    <ClCompile Include="Gomoku.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Component.hpp" />
@@ -20,10 +21,17 @@
       <Filter>Scene</Filter>
     </ClInclude>
     <ClInclude Include="Config.hpp" />
+    <ClInclude Include="KDTree.hpp">
+      <Filter>DataStructure</Filter>
+    </ClInclude>
+    <ClInclude Include="Gomoku.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Scene">
       <UniqueIdentifier>{97ee953e-c65d-4c8d-93e6-14c5b8d873df}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DataStructure">
+      <UniqueIdentifier>{16973071-7e44-43bc-815a-03d20c26532f}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>
