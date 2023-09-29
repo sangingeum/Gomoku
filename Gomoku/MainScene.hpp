@@ -14,14 +14,17 @@ private:
 	sf::VertexArray m_enabledButton;
 	sf::VertexArray m_whiteCircle;
 	sf::VertexArray m_blackCircle;
+	sf::VertexArray m_yellowCircle;
 	sf::Texture m_floorTexture;
 	sf::Font m_font;
 
-	entt::entity m_blackAutoButton;
-	entt::entity m_whiteAutoButton;
-	entt::entity m_depthField;
-	entt::entity m_gameResetButton;
-	entt::entity m_hintButton;
+	entt::entity m_blackAutoButton{ entt::null };
+	entt::entity m_whiteAutoButton{ entt::null };
+	entt::entity m_depthField{ entt::null };
+	entt::entity m_gameResetButton{ entt::null };
+	entt::entity m_hintButton{ entt::null };
+	entt::entity m_hint{ entt::null };
+
 
 	bool m_blackAuto{ false }, m_whiteAuto{ false };
 	unsigned m_depth{ 3 };
@@ -45,17 +48,17 @@ public:
 
 	void render() override {
 		m_registry.view<CBackgroundRenderable>().each([this](const CBackgroundRenderable& cRenderable) {
-			m_window.draw(cRenderable.vertexArray, cRenderable.state);
+			m_window.draw(cRenderable.vertexArray.get(), cRenderable.state);
 			});
 		m_registry.view<CRenderable>().each([this](const CRenderable& cRenderable) {
-			m_window.draw(cRenderable.vertexArray, cRenderable.state);
+			m_window.draw(cRenderable.vertexArray.get(), cRenderable.state);
 			});
 	}
 
 
 	void update() override {
 		if ((m_game.getTurn() && m_whiteAuto) || (!m_game.getTurn() && m_blackAuto)) {
-			putPiece(m_game.minimax(3));
+			putPiece(m_game.minimax(m_depth));
 		}
 	}
 
@@ -121,6 +124,7 @@ private:
 			exit(-1);
 		m_floorTexture.setSmooth(true);
 
+		m_registry.storage<entt::entity>().reserve(500);
 		// Button
 		m_button = makeRect(150, 50, sf::Color::White);
 		m_disabledButton = makeRect(150, 50, sf::Color(150, 150, 150));
@@ -143,16 +147,17 @@ private:
 
 		m_depthField = m_registry.create();
 		m_registry.emplace<CRenderable>(m_depthField, 50, 400, m_button);
-		m_registry.emplace<CListener>(m_depthField, [](void) { std::cout << "DF\n"; });
+		m_registry.emplace<CListener>(m_depthField, [this](void) { m_depth = m_depth >= 4 ? 1 : m_depth + 1; std::cout << "depth: " << m_depth << "\n"; });
 
 		m_hintButton = m_registry.create();
 		m_registry.emplace<CRenderable>(m_hintButton, 50, 500, m_button);
-		m_registry.emplace<CListener>(m_hintButton, [](void) {std::cout << "HB\n"; });
+		m_registry.emplace<CListener>(m_hintButton, [this](void) { createHint();});
 
 		// Board
 		m_rectangle = makeRect(40, 40, sf::Color::White, 2048);
 		m_whiteCircle = makeCircle(20, 30, sf::Color::White);
 		m_blackCircle = makeCircle(20, 30, sf::Color::Black);
+		m_yellowCircle = makeCircle(20, 30, sf::Color::Yellow);
 		for (int i = 0; i < 15; ++i) {
 			for (int j = 0; j < 15; ++j) {
 				auto entity = m_registry.create();
@@ -175,8 +180,26 @@ private:
 		m_registry.destroy(view.begin(), view.end());
 	}
 
+	void createHint() {
+		if (!m_registry.valid(m_hint)) {
+			m_hint = m_registry.create();
+			uint8_t index = m_game.minimax(m_depth);
+			int x = xOffset + (index % 14 + 1) * xIncrement;
+			int y = yOffset + (index / 14 + 1) * yIncrement;
+			m_registry.emplace<CRenderable>(m_hint, x, y, m_yellowCircle);
+		}
+	}
+
+	void destoryHint() {
+		if (m_registry.valid(m_hint)) {
+			m_registry.destroy(m_hint);
+		}
+	}
+
+
 	void putPiece(uint8_t index) {
 		std::cout << "index: " << unsigned(index) << "\n";
+		destoryHint();
 		auto put = m_game.putPiece(index);
 		if (put) {
 			int x = xOffset + (index % 14 + 1) * xIncrement;
