@@ -4,6 +4,8 @@
 #include <limits>
 #include <iostream>
 #include <format>
+#include <algorithm>
+#include <random>
 #define PIECE_NUM 196
 #define SQRT_PIECE_NUM 14
 // 14*14
@@ -13,14 +15,22 @@ private:
 	using Board = typename std::array<int8_t, PIECE_NUM>;
 	Board m_board;
 	bool m_turn; // True: white, False: black
+	uint8_t m_lastWhiteAction;
+	uint8_t m_lastBlackAction;
 public:
 	Gomoku()
 	{
 		reset();
 	}
 	// true: White, false: Black
-	bool getTurn() {
+	bool getTurn() const {
 		return m_turn;
+	}
+	uint8_t getLastWhiteAction() const {
+		return m_lastWhiteAction;
+	}
+	uint8_t getLastBlackAction() const{
+		return m_lastBlackAction;
 	}
 
 	void reset() {
@@ -30,17 +40,20 @@ public:
 		// -1 == Black
 		// 1 == White
 		m_turn = false; // black first
+		m_lastBlackAction = PIECE_NUM >> 1;
+		m_lastWhiteAction = m_lastBlackAction;
 	}
-	bool putPiece(uint8_t index) {
-		std::cout << "Putting Piece on " << index << "\n";
 
+	bool putPiece(uint8_t index) {
 		if (m_turn && m_board[index] == 0) {
 			m_board[index] = 1;
 			m_turn = false;
+			m_lastWhiteAction = index;
 		}
 		else if ((!m_turn) && m_board[index] == 0) {
 			m_board[index] = -1;
 			m_turn = true;
+			m_lastBlackAction = index;
 		}
 		else {
 			return false;
@@ -54,20 +67,23 @@ public:
 	}
 
 	uint8_t minimax(int depth) const {
-		return minimax(m_board, m_turn, depth);
+		return minimax(m_board, m_turn, depth, getLastBlackAction(), getLastWhiteAction());
 	}
 	
 	int evaluate() const {
 		return evaluate(m_board);
 	}
 
-	static uint8_t minimax(Board board, bool max, int depth) {
+	static uint8_t minimax(Board board, bool max, int depth, uint8_t index1, uint8_t index2) {
+		std::vector<uint8_t> nextMoves = getNextMoves(board, index1, index2);
 		int alpha = std::numeric_limits<int>::min();
 		int beta = std::numeric_limits<int>::max();
-		auto nextMoves = getNextMoves(board);
+		static std::random_device device;
+		static std::mt19937 gen(device());
+		std::shuffle(nextMoves.begin(), nextMoves.end(), gen);
 		uint8_t bestMove = nextMoves.empty() ? 250 : nextMoves[nextMoves.size()>>1];
 		if (max) {
-			for (auto move : nextMoves) {
+			for (const auto&move : nextMoves) {
 				board[move] = 1;
 				int value = minimaxHelper(board, !max, alpha, beta, depth - 1, move);
 				if (alpha < value) {
@@ -80,7 +96,7 @@ public:
 			}
 		}
 		else {
-			for (auto move : nextMoves) {
+			for (const auto& move : nextMoves) {
 				board[move] = -1;
 				int value = minimaxHelper(board, !max, alpha, beta, depth - 1, move);
 				if (beta > value) {
@@ -205,6 +221,26 @@ public:
 		return moves;
 	}
 
+	// Retrieve only nearby positions
+	static std::vector<uint8_t> getNextMoves(const Board& board, uint8_t index1, uint8_t index2, uint8_t maxLen = 5) {
+		std::vector<uint8_t> moves;
+		uint8_t row1 = index1 / SQRT_PIECE_NUM, col1 = index1 % SQRT_PIECE_NUM;
+		uint8_t row2 = index2 / SQRT_PIECE_NUM, col2 = index2 % SQRT_PIECE_NUM;
+		moves.reserve(PIECE_NUM); // May allocate unnecessary memory
+		uint8_t offset = 0;
+		for (uint8_t i = 0; i < PIECE_NUM; ++i) {
+			for (uint8_t j = 0; j < PIECE_NUM; ++j) {
+				if ((board[j + offset] == 0) && ((abs(row1 - i) + abs(col1 - j) <= maxLen) || (abs(row2 - i) + abs(col2 - j) <= maxLen))) {
+					moves.push_back(j + offset);
+				}
+			}
+			offset += SQRT_PIECE_NUM;
+		}
+		if (moves.empty())
+			return getNextMoves(board);
+		return moves;
+	}
+
 	static int evaluate(const Board& board) {
 		return evaluateHelper(board, 1) + evaluateHelper(board, -1);
 	}
@@ -216,6 +252,9 @@ private:
 			return evaluate(board);
 
 		auto nextMoves = getNextMoves(board);
+		static std::random_device device;
+		static std::mt19937 gen(device());
+		std::shuffle(nextMoves.begin(), nextMoves.end(), gen);
 		if (max) {
 			for (auto move : nextMoves) {
 				board[move] = 1;
@@ -268,7 +307,7 @@ private:
 		return score;
 	}
 
-	static int diagonalScoreHelper(const Board& board, uint8_t index, int8_t type, int adder, int8_t length) {
+	inline static int diagonalScoreHelper(const Board& board, uint8_t index, int8_t type, int adder, int8_t length) {
 		int score = 0;
 		int offset = 0;
 		int8_t closedCounter = 1;

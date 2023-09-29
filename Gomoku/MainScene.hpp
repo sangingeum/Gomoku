@@ -12,16 +12,16 @@ private:
 	sf::VertexArray m_whiteCircle;
 	sf::VertexArray m_blackCircle;
 	sf::Texture m_floorTexture;
-	//
 	using Point = typename std::array<int, 2>;
 	using PointPair = typename std::pair<Point, Point>;
 	KDTree<2, Point, int> m_tree;
-	//
 	Gomoku m_game;
-	// 
 	int xOffset{ 270 }, yOffset{ 20 };
 	int xIncrement{ 45 }, yIncrement{ 45 };
 	sf::IntRect m_boardRect{270, 20, 670, 670};
+	
+
+
 public:
 	MainScene(sf::RenderWindow& window)
 		: BaseScene(window)
@@ -46,23 +46,46 @@ public:
 		if (event.type == sf::Event::MouseButtonPressed){
 			auto buttonPos = event.mouseButton;
 			if (m_boardRect.contains({ buttonPos.x, buttonPos.y })) {
+
+				
 				std::cout << buttonPos.x << " " << buttonPos.y << "\n";
 				auto found = m_tree.findNearestNeighbor({ buttonPos.x, buttonPos.y });
 				auto [x, y] = found.first;
-				std::cout << found.second[0] << " " << found.second[1] << "\n";
+				std::cout << found.second[1] << " " << found.second[0] << "\n";
 				auto put = m_game.putPiece(found.second[0] + found.second[1]* 14);
 				std::cout << "put: " << put << " is Over: " << m_game.isOver(found.second[0] + found.second[1] * 14) << "\n";
 				std::cout << "turn: " << m_game.getTurn() << "\n";
-				auto bestAction = unsigned(m_game.minimax(3));
-				std::cout << "Best action: " << bestAction << " Row: " << bestAction/14 << " Col: " << bestAction%14 << "\n";
-				std::cout << "Board evaluation: " << m_game.evaluate() << "\n";
+
+				unsigned bestAction;
 				if (put) {
 					auto entity = m_registry.create();
-					if(m_game.getTurn())
+					if (m_game.getTurn())
+						m_registry.emplace<CRenderable>(entity, x, y, m_blackCircle);
+					else
+						m_registry.emplace<CRenderable>(entity, x, y, m_whiteCircle);
+
+					unsigned bestAction = unsigned(m_game.minimax(3));
+					std::cout << "Best action: " << bestAction << " Row: " << bestAction / 14 << " Col: " << bestAction % 14 << "\n";
+				}
+				
+				
+				std::cout << "Board evaluation: " << m_game.evaluate() << "\n";
+				
+				
+
+				/*
+				auto found = m_tree.findNearestNeighbor({ buttonPos.x, buttonPos.y });
+				auto [x, y] = found.first;
+				auto put = m_game.putPiece(found.second[0] + found.second[1]* 14);
+				if (put) {
+					auto entity = m_registry.create();
+					if (m_game.getTurn())
 						m_registry.emplace<CRenderable>(entity, x, y, m_blackCircle);
 					else
 						m_registry.emplace<CRenderable>(entity, x, y, m_whiteCircle);
 				}
+				auto bestAction = unsigned(m_game.minimax(3));
+				*/
 				
 			}
 			return true;
