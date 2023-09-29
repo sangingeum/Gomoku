@@ -21,6 +21,9 @@ private:
 	entt::entity m_gameResetButton;
 	entt::entity m_hintButton;
 
+	bool m_blackAuto{ false }, m_whiteAuto{ false };
+	unsigned m_depth{ 3 };
+
 	int xOffset{ 270 }, yOffset{ 20 };
 	int xIncrement{ 45 }, yIncrement{ 45 };
 	sf::FloatRect m_boardRect{ 270, 20, 670, 670 };
@@ -47,52 +50,65 @@ public:
 			});
 	}
 
-	void update() override {}
+	void putPiece(uint8_t index) {
+		std::cout << "index: " << unsigned(index) << "\n";
+		auto put = m_game.putPiece(index);
+		if (put) {
+			int x = xOffset + (index%14+1) * xIncrement;
+			int y = yOffset + (index/14+1) * yIncrement;
+			auto entity = m_registry.create();
+			if (m_game.getTurn())
+				m_registry.emplace<CRenderable>(entity, x, y, m_blackCircle);
+			else
+				m_registry.emplace<CRenderable>(entity, x, y, m_whiteCircle);
+		}
+	}
+
+	void update() override {
+		if ((m_game.getTurn() && m_whiteAuto) || (!m_game.getTurn() && m_blackAuto)) {
+			putPiece(m_game.minimax(3));
+		}
+	}
 
 	bool handleInput(sf::Event event) override {
 		if (event.type == sf::Event::MouseButtonPressed){
 			auto buttonPos = event.mouseButton;
 			sf::Vector2f buttonVec{ float(buttonPos.x), float(buttonPos.y) };
 			if (m_boardRect.contains(buttonVec)) {
-				std::cout << buttonPos.x << " " << buttonPos.y << "\n";
-				auto found = m_tree.findNearestNeighbor({ buttonPos.x, buttonPos.y });
-				auto [x, y] = found.first;
-				std::cout << found.second[1] << " " << found.second[0] << "\n";
-				auto put = m_game.putPiece(found.second[0] + found.second[1]* 14);
-				std::cout << "put: " << put << " is Over: " << m_game.isOver(found.second[0] + found.second[1] * 14) << "\n";
-				std::cout << "turn: " << m_game.getTurn() << "\n";
+				if ((m_game.getTurn() && !m_whiteAuto) || (!m_game.getTurn() && !m_blackAuto)) {
 
-				unsigned bestAction;
-				if (put) {
-					auto entity = m_registry.create();
-					if (m_game.getTurn())
-						m_registry.emplace<CRenderable>(entity, x, y, m_blackCircle);
-					else
-						m_registry.emplace<CRenderable>(entity, x, y, m_whiteCircle);
+					auto found = m_tree.findNearestNeighbor({ buttonPos.x, buttonPos.y });
+					putPiece(found.second[0] + found.second[1] * 14);
 
-					unsigned bestAction = unsigned(m_game.minimax(3));
-					std::cout << "Best action: " << bestAction << " Row: " << bestAction / 14 << " Col: " << bestAction % 14 << "\n";
+					std::cout << "Board evaluation: " << m_game.evaluate() << "\n";
+					/*
+					std::cout << buttonPos.x << " " << buttonPos.y << "\n";
+					auto found = m_tree.findNearestNeighbor({ buttonPos.x, buttonPos.y });
 
+
+					auto [x, y] = found.first;
+
+
+					std::cout << found.second[1] << " " << found.second[0] << "\n";
+					auto put = m_game.putPiece(found.second[0] + found.second[1] * 14);
+					std::cout << "put: " << put << " is Over: " << m_game.isOver(found.second[0] + found.second[1] * 14) << "\n";
+					std::cout << "turn: " << m_game.getTurn() << "\n";
+					if (put) {
+						auto entity = m_registry.create();
+						if (m_game.getTurn())
+							m_registry.emplace<CRenderable>(entity, x, y, m_blackCircle);
+						else
+							m_registry.emplace<CRenderable>(entity, x, y, m_whiteCircle);
+
+						unsigned bestAction = unsigned(m_game.minimax(3));
+						std::cout << "Best action: " << bestAction << " Row: " << bestAction / 14 << " Col: " << bestAction % 14 << "\n";
+
+					}
+					std::cout << "Board evaluation: " << m_game.evaluate() << "\n";
 				}
-				
-				
-				std::cout << "Board evaluation: " << m_game.evaluate() << "\n";
-				
-				
-
-				/*
-				auto found = m_tree.findNearestNeighbor({ buttonPos.x, buttonPos.y });
-				auto [x, y] = found.first;
-				auto put = m_game.putPiece(found.second[0] + found.second[1]* 14);
-				if (put) {
-					auto entity = m_registry.create();
-					if (m_game.getTurn())
-						m_registry.emplace<CRenderable>(entity, x, y, m_blackCircle);
-					else
-						m_registry.emplace<CRenderable>(entity, x, y, m_whiteCircle);
-				}
-				auto bestAction = unsigned(m_game.minimax(3));
 				*/
+				}
+				
 			}
 			else {
 				m_registry.view<CListener, CRenderable>().each([buttonVec](CListener& cListener, const CRenderable& cRenderable) {
@@ -120,11 +136,11 @@ private:
 		m_button = makeRect(150, 50, sf::Color::White);
 		m_blackAutoButton = m_registry.create();
 		m_registry.emplace<CRenderable>(m_blackAutoButton, 50, 100, m_button);
-		m_registry.emplace<CListener>(m_blackAutoButton, [](void) {std::cout << "BA\n"; });
+		m_registry.emplace<CListener>(m_blackAutoButton, [this](void) {m_blackAuto = true; }, [this](void) {m_blackAuto = false; });
 
 		m_whiteAutoButton = m_registry.create();
 		m_registry.emplace<CRenderable>(m_whiteAutoButton, 50, 200, m_button);
-		m_registry.emplace<CListener>(m_whiteAutoButton, [](void) {std::cout << "WA\n"; });
+		m_registry.emplace<CListener>(m_whiteAutoButton, [this](void) {m_whiteAuto = true; }, [this](void) {m_whiteAuto = false; });
 
 		m_depthField = m_registry.create();
 		m_registry.emplace<CRenderable>(m_depthField, 50, 300, m_button);

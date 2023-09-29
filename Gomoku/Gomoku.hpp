@@ -6,8 +6,10 @@
 #include <format>
 #include <algorithm>
 #include <random>
+
 #define PIECE_NUM 196
 #define SQRT_PIECE_NUM 14
+
 // 14*14
 class Gomoku
 {
@@ -81,7 +83,7 @@ public:
 		static std::random_device device;
 		static std::mt19937 gen(device());
 		std::shuffle(nextMoves.begin(), nextMoves.end(), gen);
-		uint8_t bestMove = nextMoves.empty() ? 250 : nextMoves[nextMoves.size()>>1];
+		uint8_t bestMove = 250;
 		if (max) {
 			for (const auto&move : nextMoves) {
 				board[move] = 1;
@@ -228,8 +230,8 @@ public:
 		uint8_t row2 = index2 / SQRT_PIECE_NUM, col2 = index2 % SQRT_PIECE_NUM;
 		moves.reserve(PIECE_NUM); // May allocate unnecessary memory
 		uint8_t offset = 0;
-		for (uint8_t i = 0; i < PIECE_NUM; ++i) {
-			for (uint8_t j = 0; j < PIECE_NUM; ++j) {
+		for (uint8_t i = 0; i < SQRT_PIECE_NUM; ++i) {
+			for (uint8_t j = 0; j < SQRT_PIECE_NUM; ++j) {
 				if ((board[j + offset] == 0) && ((abs(row1 - i) + abs(col1 - j) <= maxLen) || (abs(row2 - i) + abs(col2 - j) <= maxLen))) {
 					moves.push_back(j + offset);
 				}
