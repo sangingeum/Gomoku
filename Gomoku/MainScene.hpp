@@ -10,6 +10,8 @@ class MainScene : public BaseScene
 private:
 	sf::VertexArray m_rectangle;
 	sf::VertexArray m_button;
+	sf::VertexArray m_disabledButton;
+	sf::VertexArray m_enabledButton;
 	sf::VertexArray m_whiteCircle;
 	sf::VertexArray m_blackCircle;
 	sf::Texture m_floorTexture;
@@ -50,19 +52,6 @@ public:
 			});
 	}
 
-	void putPiece(uint8_t index) {
-		std::cout << "index: " << unsigned(index) << "\n";
-		auto put = m_game.putPiece(index);
-		if (put) {
-			int x = xOffset + (index%14+1) * xIncrement;
-			int y = yOffset + (index/14+1) * yIncrement;
-			auto entity = m_registry.create();
-			if (m_game.getTurn())
-				m_registry.emplace<CRenderable>(entity, x, y, m_blackCircle);
-			else
-				m_registry.emplace<CRenderable>(entity, x, y, m_whiteCircle);
-		}
-	}
 
 	void update() override {
 		if ((m_game.getTurn() && m_whiteAuto) || (!m_game.getTurn() && m_blackAuto)) {
@@ -134,21 +123,27 @@ private:
 
 		// Button
 		m_button = makeRect(150, 50, sf::Color::White);
+		m_disabledButton = makeRect(150, 50, sf::Color(150, 150, 150));
+		m_enabledButton = makeRect(150, 50, sf::Color::Green);
 		m_blackAutoButton = m_registry.create();
 		m_registry.emplace<CRenderable>(m_blackAutoButton, 50, 100, m_button);
-		m_registry.emplace<CListener>(m_blackAutoButton, [this](void) {m_blackAuto = true; }, [this](void) {m_blackAuto = false; });
+		m_registry.emplace<CListener>(m_blackAutoButton, 
+			[this](void) {m_blackAuto = true; m_registry.get<CRenderable>(m_blackAutoButton).vertexArray = m_enabledButton; },
+			[this](void) {m_blackAuto = false; m_registry.get<CRenderable>(m_blackAutoButton).vertexArray = m_button; });
 
 		m_whiteAutoButton = m_registry.create();
 		m_registry.emplace<CRenderable>(m_whiteAutoButton, 50, 200, m_button);
-		m_registry.emplace<CListener>(m_whiteAutoButton, [this](void) {m_whiteAuto = true; }, [this](void) {m_whiteAuto = false; });
-
-		m_depthField = m_registry.create();
-		m_registry.emplace<CRenderable>(m_depthField, 50, 300, m_button);
-		m_registry.emplace<CListener>(m_depthField, [](void) {std::cout << "DF\n"; });
+		m_registry.emplace<CListener>(m_whiteAutoButton, 
+			[this](void) {m_whiteAuto = true; m_registry.get<CRenderable>(m_whiteAutoButton).vertexArray = m_enabledButton; },
+			[this](void) {m_whiteAuto = false; m_registry.get<CRenderable>(m_whiteAutoButton).vertexArray = m_button; });
 
 		m_gameResetButton = m_registry.create();
-		m_registry.emplace<CRenderable>(m_gameResetButton, 50, 400, m_button);
-		m_registry.emplace<CListener>(m_gameResetButton, [](void) {std::cout << "GR\n"; });
+		m_registry.emplace<CRenderable>(m_gameResetButton, 50, 300, m_button);
+		m_registry.emplace<CListener>(m_gameResetButton, [this](void) {	reset(); });
+
+		m_depthField = m_registry.create();
+		m_registry.emplace<CRenderable>(m_depthField, 50, 400, m_button);
+		m_registry.emplace<CListener>(m_depthField, [](void) { std::cout << "DF\n"; });
 
 		m_hintButton = m_registry.create();
 		m_registry.emplace<CRenderable>(m_hintButton, 50, 500, m_button);
@@ -176,15 +171,24 @@ private:
 
 	void reset() {
 		m_game.reset();
+		auto view = m_registry.view<CRenderable>(entt::exclude<CListener>);
+		m_registry.destroy(view.begin(), view.end());
 	}
 
-
-	void setColor(sf::VertexArray& arr, sf::Color color) {
-		auto count = arr.getVertexCount();
-		for (uint32_t i = 0; i < count; ++i) {
-			arr[i].color = color;
+	void putPiece(uint8_t index) {
+		std::cout << "index: " << unsigned(index) << "\n";
+		auto put = m_game.putPiece(index);
+		if (put) {
+			int x = xOffset + (index % 14 + 1) * xIncrement;
+			int y = yOffset + (index / 14 + 1) * yIncrement;
+			auto entity = m_registry.create();
+			if (m_game.getTurn())
+				m_registry.emplace<CRenderable>(entity, x, y, m_blackCircle);
+			else
+				m_registry.emplace<CRenderable>(entity, x, y, m_whiteCircle);
 		}
 	}
+
 
 	sf::VertexArray makeCircle(float radius, uint32_t sides, sf::Color color) {
 		sf::VertexArray circle{ sf::PrimitiveType::TriangleFan, sides + 2 };
@@ -205,6 +209,11 @@ private:
 		arr[1].position = { width, 0 };
 		arr[2].position = { width, height };
 		arr[3].position = { 0, height };
+		arr[0].color = color;
+		arr[1].color = color;
+		arr[2].color = color;
+		arr[3].color = color;
+
 		if (textCoord != 0) {
 			arr[0].texCoords = { 0, 0 };
 			arr[1].texCoords = { textCoord, 0 };
