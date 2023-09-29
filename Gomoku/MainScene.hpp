@@ -9,7 +9,8 @@ class MainScene : public BaseScene
 {
 private:
 	sf::VertexArray m_rectangle{ sf::PrimitiveType::Quads, 4 };
-	sf::VertexArray m_circle;
+	sf::VertexArray m_whiteCircle;
+	sf::VertexArray m_blackCircle;
 	sf::Texture m_floorTexture;
 	//
 	using Point = typename std::array<int, 2>;
@@ -51,8 +52,18 @@ public:
 				std::cout << found.second[0] << " " << found.second[1] << "\n";
 				auto put = m_game.putPiece(found.second[0] + found.second[1]* 14);
 				std::cout << "put: " << put << " is Over: " << m_game.isOver(found.second[0] + found.second[1] * 14) << "\n";
-				auto entity = m_registry.create();
-				m_registry.emplace<CRenderable>(entity, x, y, m_circle);
+				std::cout << "turn: " << m_game.getTurn() << "\n";
+				auto bestAction = unsigned(m_game.minimax(3));
+				std::cout << "Best action: " << bestAction << " Row: " << bestAction/14 << " Col: " << bestAction%14 << "\n";
+				std::cout << "Board evaluation: " << m_game.evaluate() << "\n";
+				if (put) {
+					auto entity = m_registry.create();
+					if(m_game.getTurn())
+						m_registry.emplace<CRenderable>(entity, x, y, m_blackCircle);
+					else
+						m_registry.emplace<CRenderable>(entity, x, y, m_whiteCircle);
+				}
+				
 			}
 			return true;
 		}
@@ -74,7 +85,8 @@ private:
 		m_rectangle[1].texCoords = { 2048, 0 };
 		m_rectangle[2].texCoords = { 2048, 2048 };
 		m_rectangle[3].texCoords = { 0, 2048 };
-		m_circle = makeCircle(20, 30);
+		m_whiteCircle = makeCircle(20, 30, sf::Color::White);
+		m_blackCircle = makeCircle(20, 30, sf::Color::Black);
 
 		for (int i = 0; i < 15; ++i) {
 			for (int j = 0; j < 15; ++j) {
@@ -104,13 +116,15 @@ private:
 		}
 	}
 
-	sf::VertexArray makeCircle(float radius, uint32_t sides) {
+	sf::VertexArray makeCircle(float radius, uint32_t sides, sf::Color color) {
 		sf::VertexArray circle{ sf::PrimitiveType::TriangleFan, sides + 2 };
 		auto pi = Config::instance().pi;
 		circle[0].position = { 0, 0 };
+		circle[0].color = color;
 		auto step = (2 * pi) / sides;
 		for (uint32_t i = 1; i <= sides+1; ++i) {
 			circle[i].position = { radius * cos(step * i), radius * sin(step * i) };
+			circle[i].color = color;
 		}
 
 		return circle;
