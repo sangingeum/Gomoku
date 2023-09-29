@@ -8,19 +8,27 @@
 class MainScene : public BaseScene
 {
 private:
-	sf::VertexArray m_rectangle{ sf::PrimitiveType::Quads, 4 };
+	sf::VertexArray m_rectangle;
+	sf::VertexArray m_button;
 	sf::VertexArray m_whiteCircle;
 	sf::VertexArray m_blackCircle;
 	sf::Texture m_floorTexture;
+	sf::Font m_font;
+
+	entt::entity m_blackAutoButton;
+	entt::entity m_whiteAutoButton;
+	entt::entity m_depthField;
+	entt::entity m_gameResetButton;
+	entt::entity m_hintButton;
+
+	int xOffset{ 270 }, yOffset{ 20 };
+	int xIncrement{ 45 }, yIncrement{ 45 };
+	sf::FloatRect m_boardRect{ 270, 20, 670, 670 };
+
 	using Point = typename std::array<int, 2>;
 	using PointPair = typename std::pair<Point, Point>;
 	KDTree<2, Point, int> m_tree;
 	Gomoku m_game;
-	int xOffset{ 270 }, yOffset{ 20 };
-	int xIncrement{ 45 }, yIncrement{ 45 };
-	sf::IntRect m_boardRect{270, 20, 670, 670};
-	
-
 
 public:
 	MainScene(sf::RenderWindow& window)
@@ -31,7 +39,6 @@ public:
 	}
 
 	void render() override {
-
 		m_registry.view<CBackgroundRenderable>().each([this](const CBackgroundRenderable& cRenderable) {
 			m_window.draw(cRenderable.vertexArray, cRenderable.state);
 			});
@@ -45,9 +52,8 @@ public:
 	bool handleInput(sf::Event event) override {
 		if (event.type == sf::Event::MouseButtonPressed){
 			auto buttonPos = event.mouseButton;
-			if (m_boardRect.contains({ buttonPos.x, buttonPos.y })) {
-
-				
+			sf::Vector2f buttonVec{ float(buttonPos.x), float(buttonPos.y) };
+			if (m_boardRect.contains(buttonVec)) {
 				std::cout << buttonPos.x << " " << buttonPos.y << "\n";
 				auto found = m_tree.findNearestNeighbor({ buttonPos.x, buttonPos.y });
 				auto [x, y] = found.first;
@@ -66,6 +72,7 @@ public:
 
 					unsigned bestAction = unsigned(m_game.minimax(3));
 					std::cout << "Best action: " << bestAction << " Row: " << bestAction / 14 << " Col: " << bestAction % 14 << "\n";
+
 				}
 				
 				
@@ -86,8 +93,15 @@ public:
 				}
 				auto bestAction = unsigned(m_game.minimax(3));
 				*/
-				
 			}
+			else {
+				m_registry.view<CListener, CRenderable>().each([buttonVec](CListener& cListener, const CRenderable& cRenderable) {
+					if (cRenderable.getBound().contains(buttonVec)) {
+						cListener.listen();
+					}
+					});
+			}
+
 			return true;
 		}
 		
@@ -95,22 +109,39 @@ public:
 	}
 private:
 	void loadAndInit() {
-		if (!m_floorTexture.loadFromFile("resources/dark_wood_diff_2k.jpg"))
+		// Asset
+		if (!m_floorTexture.loadFromFile("resources/texture/dark_wood_diff_2k.jpg"))
+			exit(-1);
+		if(!m_font.loadFromFile("resources/font/Roboto-Medium.ttf"))
 			exit(-1);
 		m_floorTexture.setSmooth(true);
-		//m_floorSprite.setTexture(m_floorTexture);
-		//m_floorSprite.setScale({ 0.0196f, 0.0196f });
-		m_rectangle[0].position = { 0, 0 };
-		m_rectangle[1].position = { 40, 0 };
-		m_rectangle[2].position = { 40, 40 };
-		m_rectangle[3].position = { 0, 40 };
-		m_rectangle[0].texCoords = { 0, 0 };
-		m_rectangle[1].texCoords = { 2048, 0 };
-		m_rectangle[2].texCoords = { 2048, 2048 };
-		m_rectangle[3].texCoords = { 0, 2048 };
+
+		// Button
+		m_button = makeRect(150, 50, sf::Color::White);
+		m_blackAutoButton = m_registry.create();
+		m_registry.emplace<CRenderable>(m_blackAutoButton, 50, 100, m_button);
+		m_registry.emplace<CListener>(m_blackAutoButton, [](void) {std::cout << "BA\n"; });
+
+		m_whiteAutoButton = m_registry.create();
+		m_registry.emplace<CRenderable>(m_whiteAutoButton, 50, 200, m_button);
+		m_registry.emplace<CListener>(m_whiteAutoButton, [](void) {std::cout << "WA\n"; });
+
+		m_depthField = m_registry.create();
+		m_registry.emplace<CRenderable>(m_depthField, 50, 300, m_button);
+		m_registry.emplace<CListener>(m_depthField, [](void) {std::cout << "DF\n"; });
+
+		m_gameResetButton = m_registry.create();
+		m_registry.emplace<CRenderable>(m_gameResetButton, 50, 400, m_button);
+		m_registry.emplace<CListener>(m_gameResetButton, [](void) {std::cout << "GR\n"; });
+
+		m_hintButton = m_registry.create();
+		m_registry.emplace<CRenderable>(m_hintButton, 50, 500, m_button);
+		m_registry.emplace<CListener>(m_hintButton, [](void) {std::cout << "HB\n"; });
+
+		// Board
+		m_rectangle = makeRect(40, 40, sf::Color::White, 2048);
 		m_whiteCircle = makeCircle(20, 30, sf::Color::White);
 		m_blackCircle = makeCircle(20, 30, sf::Color::Black);
-
 		for (int i = 0; i < 15; ++i) {
 			for (int j = 0; j < 15; ++j) {
 				auto entity = m_registry.create();
@@ -149,8 +180,22 @@ private:
 			circle[i].position = { radius * cos(step * i), radius * sin(step * i) };
 			circle[i].color = color;
 		}
-
 		return circle;
+	}
+
+	sf::VertexArray makeRect(float width, float height, sf::Color color, float textCoord = 0) {
+		sf::VertexArray arr{ sf::PrimitiveType::Quads, 4 };
+		arr[0].position = { 0, 0 };
+		arr[1].position = { width, 0 };
+		arr[2].position = { width, height };
+		arr[3].position = { 0, height };
+		if (textCoord != 0) {
+			arr[0].texCoords = { 0, 0 };
+			arr[1].texCoords = { textCoord, 0 };
+			arr[2].texCoords = { textCoord, textCoord };
+			arr[3].texCoords = { 0, textCoord };
+		}
+		return arr;
 	}
 
 };
