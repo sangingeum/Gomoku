@@ -34,6 +34,9 @@ public:
 	uint8_t getLastBlackAction() const{
 		return m_lastBlackAction;
 	}
+	uint8_t getSqrtPieceNum() {
+		return SQRT_PIECE_NUM;
+	}
 
 	void reset() {
 		for (auto& piece : m_board)

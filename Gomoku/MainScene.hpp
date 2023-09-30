@@ -34,7 +34,7 @@ private:
 	sf::Text m_hintText{ sf::Text(sf::String("Hint"), m_font) };
 	sf::Text m_statusText{ sf::Text(sf::String("Status : Idle"), m_font) };
 
-	std::atomic<bool> m_blackAuto{ false }, m_whiteAuto{ false }, m_busy{ false };
+	std::atomic<bool> m_blackAuto{ false }, m_whiteAuto{ false }, m_busy{ false }, m_over{ false };
 	std::atomic<unsigned> m_depth{ 3 };
 
 	int xOffset{ 270 }, yOffset{ 20 };
@@ -83,8 +83,10 @@ public:
 			if (!m_busy && m_boardRect.contains(buttonVec)) {
 				if (((m_game.getTurn() && !m_whiteAuto) || (!m_game.getTurn() && !m_blackAuto))) {
 					auto found = m_tree.findNearestNeighbor({ buttonPos.x, buttonPos.y });
-					putPiece(found.second[0] + found.second[1] * 14);
-					
+					auto over = putPiece(found.second[0] + found.second[1] * SQRT_PIECE_NUM);
+					if (over) {
+						gameOver(over);
+					}
 				}
 			}
 			else {
@@ -102,9 +104,6 @@ private:
 	void loadAndInit() {
 		// variables
 		m_depth = 3;
-		m_blackAuto = false;
-		m_whiteAuto = false;
-		m_busy = false;
 		m_depthText.setString("Depth: 3");
 
 		// Asset
@@ -164,7 +163,7 @@ private:
 		m_registry.emplace<CText>(m_registry.create(), 73, 305, m_gameResetText);
 		m_registry.emplace<CText>(m_registry.create(), 65, 405, m_depthText);
 		m_registry.emplace<CText>(m_registry.create(), 80, 505, m_hintText);
-		m_registry.emplace<CText>(m_registry.create(), 27, 605, m_statusText);
+		m_registry.emplace<CText>(m_registry.create(), 23, 605, m_statusText);
 
 		// Board
 		m_flootRect = makeRect(40, 40, sf::Color::White, 2048);
@@ -179,12 +178,14 @@ private:
 		}
 		std::vector<PointPair> treeData;
 		treeData.reserve(196); // 14*14
-		for (int i = 1; i <= 14; ++i) {
-			for (int j = 1; j <= 14; ++j) {
+		for (int i = 1; i <= SQRT_PIECE_NUM; ++i) {
+			for (int j = 1; j <= SQRT_PIECE_NUM; ++j) {
 				treeData.push_back(std::make_pair(Point({ xOffset + i * xIncrement, yOffset + j * yIncrement }), Point({ i - 1, j - 1 })));
 			}
 		}
 		m_tree.buildTree(treeData);
+
+		reset();
 	}
 
 	bool disableAllButtons() {
@@ -209,10 +210,33 @@ private:
 		m_busy = false;
 	}
 	
+	void gameOver(int over) {
+		if (over==1) {
+			m_statusText.setString("Status: White Won");
+		}
+		else if(over == -1) {
+			m_statusText.setString("Status: Black Won");
+		}
+		else {
+			return;
+		}
+		for (entt::entity button : {m_hintButton, m_blackAutoButton , m_whiteAutoButton}) {
+			auto [cListener, cRenderable] = m_registry.get<CListener, CRenderable>(button);
+			cListener.disabled = true;
+			cRenderable.vertexArray = m_disabledButtonRect;
+		}
+		m_busy = true;
+		m_over = true;
+	}
+
+
 	// Thread function // disableAllButtons should be called before this
 	void playAI() {
-		putPiece(m_game.minimax(m_depth));
+		auto over = putPiece(m_game.minimax(m_depth));
 		enableAllButtons();
+		if (over) {
+			gameOver(over);
+		}
 	}
 
 	// Thread function // disableAllButtons should be called before this
@@ -221,8 +245,8 @@ private:
 		if (!m_registry.valid(view.front())) {
 			auto entity = m_registry.create();
 			uint8_t index = m_game.minimax(m_depth);
-			int x = xOffset + (index % 14 + 1) * xIncrement;
-			int y = yOffset + (index / 14 + 1) * yIncrement;
+			int x = xOffset + (index % SQRT_PIECE_NUM + 1) * xIncrement;
+			int y = yOffset + (index / SQRT_PIECE_NUM + 1) * yIncrement;
 			m_registry.emplace<CRenderable>(entity, x, y, m_yellowCircle);
 			m_registry.emplace<CToRemove>(entity, 0);
 		}
@@ -237,21 +261,30 @@ private:
 	}
 
 	void reset() {
-		if (!m_busy) {
+		if (!m_busy || m_over) {
 			m_game.reset();
 			auto view = m_registry.view<CRenderable>(entt::exclude<CListener>);
 			m_registry.destroy(view.begin(), view.end());
+			for (entt::entity button : {m_gameResetButton, m_hintButton, m_blackAutoButton, m_whiteAutoButton, m_depthButton}) {
+				auto [cListener, cRenderable] = m_registry.get<CListener, CRenderable>(button);
+				cListener.disabled = false;
+				cRenderable.vertexArray = m_buttonRect;
+			}
+			m_statusText.setString("Status: Idle");
+			m_blackAuto = false;
+			m_whiteAuto = false;
+			m_busy = false;
+			m_over = false;
 		}
 	}
 
-	void putPiece(uint8_t index) {
+	int putPiece(uint8_t index) {
 		std::cout << "index: " << unsigned(index) << "\n";
-		
 		destoryHint();
 		auto put = m_game.putPiece(index);
 		if (put) {
-			int x = xOffset + (index % 14 + 1) * xIncrement;
-			int y = yOffset + (index / 14 + 1) * yIncrement;
+			int x = xOffset + (index % SQRT_PIECE_NUM + 1) * xIncrement;
+			int y = yOffset + (index / SQRT_PIECE_NUM + 1) * yIncrement;
 			auto entity = m_registry.create();
 			if (m_game.getTurn())
 				m_registry.emplace<CRenderable>(entity, x, y, m_blackCircle);
@@ -259,6 +292,9 @@ private:
 				m_registry.emplace<CRenderable>(entity, x, y, m_whiteCircle);
 		}
 		std::cout << "Board evaluation: " << m_game.evaluate() << "\n";
+		int over = m_game.isOver(index);
+		std::cout << "IsOver: " << m_game.isOver(index) << "\n";
+		return over;
 	}
 
 
