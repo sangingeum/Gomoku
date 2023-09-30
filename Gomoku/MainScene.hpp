@@ -84,7 +84,7 @@ public:
 				if (((m_game.getTurn() && !m_whiteAuto) || (!m_game.getTurn() && !m_blackAuto))) {
 					auto found = m_tree.findNearestNeighbor({ buttonPos.x, buttonPos.y });
 					putPiece(found.second[0] + found.second[1] * 14);
-					std::cout << "Board evaluation: " << m_game.evaluate() << "\n";
+					
 				}
 			}
 			else {
@@ -246,6 +246,7 @@ private:
 
 	void putPiece(uint8_t index) {
 		std::cout << "index: " << unsigned(index) << "\n";
+		
 		destoryHint();
 		auto put = m_game.putPiece(index);
 		if (put) {
@@ -257,6 +258,7 @@ private:
 			else
 				m_registry.emplace<CRenderable>(entity, x, y, m_whiteCircle);
 		}
+		std::cout << "Board evaluation: " << m_game.evaluate() << "\n";
 	}
 
 

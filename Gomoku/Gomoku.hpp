@@ -245,14 +245,19 @@ private:
 		return moves;
 	}
 
+
 	static int evaluate(const Board& board) {
 		return evaluateHelper(board, 1) + evaluateHelper(board, -1);
 	}
 
-	static int minimaxHelper(Board& board, bool max, int alpha, int beta, int depth, uint8_t lastAction) {
-		if (depth <= 0 || isOver(board, lastAction))
-			return evaluate(board);
 
+	static int minimaxHelper(Board& board, bool max, int alpha, int beta, int depth, uint8_t lastAction) {
+		int over = isOver(board, lastAction);
+		if (over)
+			return over == 1 ? 100000 : -100000;
+		if (depth <= 0)
+			return evaluate(board);
+		
 		auto nextMoves = getNextMoves(board);
 		static std::random_device device;
 		static std::mt19937 gen(device());
@@ -260,7 +265,7 @@ private:
 		if (max) {
 			for (auto move : nextMoves) {
 				board[move] = 1;
-				alpha = std::max(alpha, minimaxHelper(board, !max, alpha, beta, depth - 1, move));
+				alpha = std::max(alpha, int(minimaxHelper(board, !max, alpha, beta, depth - 1, move)));
 				board[move] = 0;
 				if (alpha >= beta)
 					break;
@@ -270,7 +275,7 @@ private:
 		else {
 			for (auto move : nextMoves) {
 				board[move] = -1;
-				beta = std::min(beta, minimaxHelper(board, !max, alpha, beta, depth - 1, move));
+				beta = std::min(beta, int(minimaxHelper(board, !max, alpha, beta, depth - 1, move)));
 				board[move] = 0;
 				if (alpha >= beta)
 					break;
@@ -317,7 +322,7 @@ private:
 		int8_t stoneCounter = 0;
 		for (int i = 0; i < length; ++i) {
 			auto cur = board[index + offset];
-			scoreHelper(cur, type, closedCounter, stoneCounter);
+			score += scoreHelper(cur, type, closedCounter, stoneCounter);
 			offset += adder;
 		}
 		++closedCounter;
@@ -335,7 +340,7 @@ private:
 			int8_t stoneCounter = 0;
 			for (int j = 0; j < SQRT_PIECE_NUM; ++j) {
 				auto cur = board[j + offset];
-				scoreHelper(cur, type, closedCounter, stoneCounter);
+				score += scoreHelper(cur, type, closedCounter, stoneCounter);
 			}
 			// consider the wall at the end
 			++closedCounter;
@@ -350,7 +355,7 @@ private:
 			int offset = 0;
 			for (int j = 0; j < SQRT_PIECE_NUM; ++j) {
 				auto cur = board[offset + i];
-				scoreHelper(cur, type, closedCounter, stoneCounter);
+				score += scoreHelper(cur, type, closedCounter, stoneCounter);
 				// update offset
 				offset += SQRT_PIECE_NUM;
 			}
@@ -363,7 +368,7 @@ private:
 		for (int i = 0; i < SQRT_PIECE_NUM; ++i) {
 			score += diagonalScoreHelper(board, i, type, adder, SQRT_PIECE_NUM - i);
 		}
-		for (int i = 1, index = 0; i < SQRT_PIECE_NUM; ++i) {
+		for (int i = 1, index = SQRT_PIECE_NUM; i < SQRT_PIECE_NUM; ++i) {
 			score += diagonalScoreHelper(board, index, type, adder, SQRT_PIECE_NUM - i);
 			index += SQRT_PIECE_NUM;
 		}
@@ -372,9 +377,9 @@ private:
 		for (int i = 0; i < SQRT_PIECE_NUM; ++i) {
 			score += diagonalScoreHelper(board, i, type, adder, i + 1);
 		}
-		for (int i = 1, index = 13; i < SQRT_PIECE_NUM; ++i) {
-			score += diagonalScoreHelper(board, index, type, adder, SQRT_PIECE_NUM - i);
+		for (int i = 1, index = SQRT_PIECE_NUM - 1; i < SQRT_PIECE_NUM; ++i) {
 			index += SQRT_PIECE_NUM;
+			score += diagonalScoreHelper(board, index, type, adder, SQRT_PIECE_NUM - i);
 		}
 		return ((type == 1) ? score : -score);
 	}
