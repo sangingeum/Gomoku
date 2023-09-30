@@ -238,7 +238,6 @@ void MainScene::reset() {
 
 // Place a piece at 'index' position
 int MainScene::putPiece(uint8_t index) {
-	std::cout << "index: " << unsigned(index) << "\n";
 	destoryHint();
 	auto put = m_game.putPiece(index);
 	if (put) {
@@ -250,9 +249,7 @@ int MainScene::putPiece(uint8_t index) {
 		else
 			m_registry.emplace<CRenderable>(entity, x, y, m_whiteCircle);
 	}
-	std::cout << "Board evaluation: " << m_game.evaluate() << "\n";
 	int over = m_game.isOver(index);
-	std::cout << "IsOver: " << m_game.isOver(index) << "\n";
 	return over;
 }
 

@@ -1,11 +1,9 @@
 #pragma once
 #include "BaseScene.hpp"
-#include <iostream>
 #include "Config.hpp"
 #include "KDTree.hpp"
 #include "Gomoku.hpp"
 #include <thread>
-#include <future>
 #include <atomic>
 
 class MainScene : public BaseScene
