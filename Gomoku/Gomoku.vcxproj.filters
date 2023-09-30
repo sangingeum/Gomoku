@@ -3,9 +3,6 @@
   <ItemGroup>
     <ClCompile Include="GameSystem.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="BaseScene.cpp">
-      <Filter>Scene</Filter>
-    </ClCompile>
     <ClCompile Include="MainScene.cpp">
       <Filter>Scene</Filter>
     </ClCompile>

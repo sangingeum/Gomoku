@@ -19,7 +19,6 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="BaseScene.cpp" />
     <ClCompile Include="GameSystem.cpp" />
     <ClCompile Include="Gomoku.cpp" />
     <ClCompile Include="main.cpp" />
