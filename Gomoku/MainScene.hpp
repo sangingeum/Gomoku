@@ -4,14 +4,17 @@
 #include "Config.hpp"
 #include "KDTree.hpp"
 #include "Gomoku.hpp"
+#include <thread>
+#include <future>
+#include <atomic>
 
 class MainScene : public BaseScene
 {
 private:
-	sf::VertexArray m_rectangle;
-	sf::VertexArray m_button;
-	sf::VertexArray m_disabledButton;
-	sf::VertexArray m_enabledButton;
+	sf::VertexArray m_flootRect;
+	sf::VertexArray m_buttonRect;
+	sf::VertexArray m_disabledButtonRect;
+	sf::VertexArray m_enabledButtonRect;
 	sf::VertexArray m_whiteCircle;
 	sf::VertexArray m_blackCircle;
 	sf::VertexArray m_yellowCircle;
@@ -20,14 +23,19 @@ private:
 
 	entt::entity m_blackAutoButton{ entt::null };
 	entt::entity m_whiteAutoButton{ entt::null };
-	entt::entity m_depthField{ entt::null };
 	entt::entity m_gameResetButton{ entt::null };
+	entt::entity m_depthButton{ entt::null };
 	entt::entity m_hintButton{ entt::null };
-	entt::entity m_hint{ entt::null };
 
+	sf::Text m_blackAutoText{ sf::Text(sf::String("Black Auto"), m_font) };
+	sf::Text m_whiteAutoText{ sf::Text(sf::String("White Auto"), m_font) };
+	sf::Text m_depthText{ sf::Text(sf::String("Depth: 3"), m_font) };
+	sf::Text m_gameResetText{ sf::Text(sf::String("Reset"), m_font) };
+	sf::Text m_hintText{ sf::Text(sf::String("Hint"), m_font) };
+	sf::Text m_statusText{ sf::Text(sf::String("Status : Idle"), m_font) };
 
-	bool m_blackAuto{ false }, m_whiteAuto{ false };
-	unsigned m_depth{ 3 };
+	std::atomic<bool> m_blackAuto{ false }, m_whiteAuto{ false }, m_busy{ false };
+	std::atomic<unsigned> m_depth{ 3 };
 
 	int xOffset{ 270 }, yOffset{ 20 };
 	int xIncrement{ 45 }, yIncrement{ 45 };
@@ -53,12 +61,18 @@ public:
 		m_registry.view<CRenderable>().each([this](const CRenderable& cRenderable) {
 			m_window.draw(cRenderable.vertexArray.get(), cRenderable.state);
 			});
+		m_registry.view<CText>().each([this](const CText& cRenderable) {
+			m_window.draw(cRenderable.text.get(), cRenderable.state);
+			});
 	}
 
 
 	void update() override {
 		if ((m_game.getTurn() && m_whiteAuto) || (!m_game.getTurn() && m_blackAuto)) {
-			putPiece(m_game.minimax(m_depth));
+			if (disableAllButtons()) {
+				m_statusText.setString("Status: AI Playing");
+				std::thread{ &MainScene::playAI, this }.detach();
+			}
 		}
 	}
 
@@ -66,41 +80,12 @@ public:
 		if (event.type == sf::Event::MouseButtonPressed){
 			auto buttonPos = event.mouseButton;
 			sf::Vector2f buttonVec{ float(buttonPos.x), float(buttonPos.y) };
-			if (m_boardRect.contains(buttonVec)) {
-				if ((m_game.getTurn() && !m_whiteAuto) || (!m_game.getTurn() && !m_blackAuto)) {
-
+			if (!m_busy && m_boardRect.contains(buttonVec)) {
+				if (((m_game.getTurn() && !m_whiteAuto) || (!m_game.getTurn() && !m_blackAuto))) {
 					auto found = m_tree.findNearestNeighbor({ buttonPos.x, buttonPos.y });
 					putPiece(found.second[0] + found.second[1] * 14);
-
-					std::cout << "Board evaluation: " << m_game.evaluate() << "\n";
-					/*
-					std::cout << buttonPos.x << " " << buttonPos.y << "\n";
-					auto found = m_tree.findNearestNeighbor({ buttonPos.x, buttonPos.y });
-
-
-					auto [x, y] = found.first;
-
-
-					std::cout << found.second[1] << " " << found.second[0] << "\n";
-					auto put = m_game.putPiece(found.second[0] + found.second[1] * 14);
-					std::cout << "put: " << put << " is Over: " << m_game.isOver(found.second[0] + found.second[1] * 14) << "\n";
-					std::cout << "turn: " << m_game.getTurn() << "\n";
-					if (put) {
-						auto entity = m_registry.create();
-						if (m_game.getTurn())
-							m_registry.emplace<CRenderable>(entity, x, y, m_blackCircle);
-						else
-							m_registry.emplace<CRenderable>(entity, x, y, m_whiteCircle);
-
-						unsigned bestAction = unsigned(m_game.minimax(3));
-						std::cout << "Best action: " << bestAction << " Row: " << bestAction / 14 << " Col: " << bestAction % 14 << "\n";
-
-					}
 					std::cout << "Board evaluation: " << m_game.evaluate() << "\n";
 				}
-				*/
-				}
-				
 			}
 			else {
 				m_registry.view<CListener, CRenderable>().each([buttonVec](CListener& cListener, const CRenderable& cRenderable) {
@@ -109,14 +94,19 @@ public:
 					}
 					});
 			}
-
 			return true;
 		}
-		
 		return false;
 	}
 private:
 	void loadAndInit() {
+		// variables
+		m_depth = 3;
+		m_blackAuto = false;
+		m_whiteAuto = false;
+		m_busy = false;
+		m_depthText.setString("Depth: 3");
+
 		// Asset
 		if (!m_floorTexture.loadFromFile("resources/texture/dark_wood_diff_2k.jpg"))
 			exit(-1);
@@ -124,44 +114,67 @@ private:
 			exit(-1);
 		m_floorTexture.setSmooth(true);
 
-		m_registry.storage<entt::entity>().reserve(500);
+		//m_registry.storage<entt::entity>().reserve(500);
 		// Button
-		m_button = makeRect(150, 50, sf::Color::White);
-		m_disabledButton = makeRect(150, 50, sf::Color(150, 150, 150));
-		m_enabledButton = makeRect(150, 50, sf::Color::Green);
+		m_buttonRect = makeRect(150, 50, sf::Color::White);
+		m_disabledButtonRect = makeRect(150, 50, sf::Color(150, 150, 150));
+		m_enabledButtonRect = makeRect(150, 50, sf::Color::Green);
 		m_blackAutoButton = m_registry.create();
-		m_registry.emplace<CRenderable>(m_blackAutoButton, 50, 100, m_button);
+		m_registry.emplace<CRenderable>(m_blackAutoButton, 50, 100, m_buttonRect);
 		m_registry.emplace<CListener>(m_blackAutoButton, 
-			[this](void) {m_blackAuto = true; m_registry.get<CRenderable>(m_blackAutoButton).vertexArray = m_enabledButton; },
-			[this](void) {m_blackAuto = false; m_registry.get<CRenderable>(m_blackAutoButton).vertexArray = m_button; });
+			[this](void) {m_blackAuto = true; m_registry.get<CRenderable>(m_blackAutoButton).vertexArray = m_enabledButtonRect; },
+			[this](void) {m_blackAuto = false; m_registry.get<CRenderable>(m_blackAutoButton).vertexArray = m_buttonRect; });
 
 		m_whiteAutoButton = m_registry.create();
-		m_registry.emplace<CRenderable>(m_whiteAutoButton, 50, 200, m_button);
+		m_registry.emplace<CRenderable>(m_whiteAutoButton, 50, 200, m_buttonRect);
 		m_registry.emplace<CListener>(m_whiteAutoButton, 
-			[this](void) {m_whiteAuto = true; m_registry.get<CRenderable>(m_whiteAutoButton).vertexArray = m_enabledButton; },
-			[this](void) {m_whiteAuto = false; m_registry.get<CRenderable>(m_whiteAutoButton).vertexArray = m_button; });
+			[this](void) {m_whiteAuto = true; m_registry.get<CRenderable>(m_whiteAutoButton).vertexArray = m_enabledButtonRect; },
+			[this](void) {m_whiteAuto = false; m_registry.get<CRenderable>(m_whiteAutoButton).vertexArray = m_buttonRect; });
 
 		m_gameResetButton = m_registry.create();
-		m_registry.emplace<CRenderable>(m_gameResetButton, 50, 300, m_button);
+		m_registry.emplace<CRenderable>(m_gameResetButton, 50, 300, m_buttonRect);
 		m_registry.emplace<CListener>(m_gameResetButton, [this](void) {	reset(); });
 
-		m_depthField = m_registry.create();
-		m_registry.emplace<CRenderable>(m_depthField, 50, 400, m_button);
-		m_registry.emplace<CListener>(m_depthField, [this](void) { m_depth = m_depth >= 4 ? 1 : m_depth + 1; std::cout << "depth: " << m_depth << "\n"; });
+		m_depthButton = m_registry.create();
+		m_registry.emplace<CRenderable>(m_depthButton, 50, 400, m_buttonRect);
+		m_registry.emplace<CListener>(m_depthButton, 
+			[this](void) { 
+				m_depth = m_depth >= 4 ? 1 : m_depth + 1; 
+				m_depthText.setString("Depth: " + std::to_string(m_depth));
+			});
 
 		m_hintButton = m_registry.create();
-		m_registry.emplace<CRenderable>(m_hintButton, 50, 500, m_button);
-		m_registry.emplace<CListener>(m_hintButton, [this](void) { createHint();});
+		m_registry.emplace<CRenderable>(m_hintButton, 50, 500, m_buttonRect);
+		m_registry.emplace<CListener>(m_hintButton, [this](void) { 
+			if (disableAllButtons()) {
+				m_statusText.setString("Status: Hint");
+				std::thread{ &MainScene::createHint, this }.detach();
+			}
+			});
+
+		// Labels
+		m_blackAutoText.setFillColor(sf::Color::Black);
+		m_whiteAutoText.setFillColor(sf::Color::Black);
+		m_gameResetText.setFillColor(sf::Color::Black);
+		m_depthText.setFillColor(sf::Color::Black);
+		m_hintText.setFillColor(sf::Color::Black);
+		m_statusText.setFillColor(sf::Color::White);
+		m_registry.emplace<CText>(m_registry.create(), 53, 105, m_blackAutoText);
+		m_registry.emplace<CText>(m_registry.create(), 53, 205, m_whiteAutoText);
+		m_registry.emplace<CText>(m_registry.create(), 73, 305, m_gameResetText);
+		m_registry.emplace<CText>(m_registry.create(), 65, 405, m_depthText);
+		m_registry.emplace<CText>(m_registry.create(), 80, 505, m_hintText);
+		m_registry.emplace<CText>(m_registry.create(), 27, 605, m_statusText);
 
 		// Board
-		m_rectangle = makeRect(40, 40, sf::Color::White, 2048);
+		m_flootRect = makeRect(40, 40, sf::Color::White, 2048);
 		m_whiteCircle = makeCircle(20, 30, sf::Color::White);
 		m_blackCircle = makeCircle(20, 30, sf::Color::Black);
 		m_yellowCircle = makeCircle(20, 30, sf::Color::Yellow);
 		for (int i = 0; i < 15; ++i) {
 			for (int j = 0; j < 15; ++j) {
 				auto entity = m_registry.create();
-				m_registry.emplace<CBackgroundRenderable>(entity, xOffset + i * xIncrement, yOffset + j * yIncrement, m_rectangle, &m_floorTexture);
+				m_registry.emplace<CBackgroundRenderable>(entity, xOffset + i * xIncrement, yOffset + j * yIncrement, m_flootRect, &m_floorTexture);
 			}
 		}
 		std::vector<PointPair> treeData;
@@ -174,28 +187,62 @@ private:
 		m_tree.buildTree(treeData);
 	}
 
-	void reset() {
-		m_game.reset();
-		auto view = m_registry.view<CRenderable>(entt::exclude<CListener>);
-		m_registry.destroy(view.begin(), view.end());
+	bool disableAllButtons() {
+		if (m_busy)
+			return false;
+		m_busy = true;
+		for (entt::entity button : {m_gameResetButton, m_hintButton}) {
+			auto [cListener, cRenderable] = m_registry.get<CListener, CRenderable>(button);
+			cListener.disabled = true;
+			cRenderable.vertexArray = m_disabledButtonRect;
+		}
+		return true;
 	}
 
+	void enableAllButtons() {
+		for (entt::entity button : {m_gameResetButton, m_hintButton}) {
+			auto [cListener, cRenderable] = m_registry.get<CListener, CRenderable>(button);
+			cListener.disabled = false;
+			cRenderable.vertexArray = m_buttonRect;
+		}
+		m_statusText.setString("Status: Idle");
+		m_busy = false;
+	}
+	
+	// Thread function // disableAllButtons should be called before this
+	void playAI() {
+		putPiece(m_game.minimax(m_depth));
+		enableAllButtons();
+	}
+
+	// Thread function // disableAllButtons should be called before this
 	void createHint() {
-		if (!m_registry.valid(m_hint)) {
-			m_hint = m_registry.create();
+		auto view = m_registry.view<CRenderable, CToRemove>();
+		if (!m_registry.valid(view.front())) {
+			auto entity = m_registry.create();
 			uint8_t index = m_game.minimax(m_depth);
 			int x = xOffset + (index % 14 + 1) * xIncrement;
 			int y = yOffset + (index / 14 + 1) * yIncrement;
-			m_registry.emplace<CRenderable>(m_hint, x, y, m_yellowCircle);
+			m_registry.emplace<CRenderable>(entity, x, y, m_yellowCircle);
+			m_registry.emplace<CToRemove>(entity, 0);
 		}
+		enableAllButtons();
 	}
 
 	void destoryHint() {
-		if (m_registry.valid(m_hint)) {
-			m_registry.destroy(m_hint);
+		auto view = m_registry.view<CRenderable, CToRemove>();
+		if (m_registry.valid(view.front())) {
+			m_registry.destroy(view.front());
 		}
 	}
 
+	void reset() {
+		if (!m_busy) {
+			m_game.reset();
+			auto view = m_registry.view<CRenderable>(entt::exclude<CListener>);
+			m_registry.destroy(view.begin(), view.end());
+		}
+	}
 
 	void putPiece(uint8_t index) {
 		std::cout << "index: " << unsigned(index) << "\n";

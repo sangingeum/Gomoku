@@ -69,14 +69,16 @@ public:
 	}
 
 	uint8_t minimax(int depth) const {
-		return minimax(m_board, m_turn, depth, getLastBlackAction(), getLastWhiteAction());
+		return InternalMinimax(m_board, m_turn, depth, getLastBlackAction(), getLastWhiteAction());
 	}
 	
 	int evaluate() const {
 		return evaluate(m_board);
 	}
 
-	static uint8_t minimax(Board board, bool max, int depth, uint8_t index1, uint8_t index2) {
+private:
+
+	static uint8_t InternalMinimax(Board board, bool max, int depth, uint8_t index1, uint8_t index2) {
 		std::vector<uint8_t> nextMoves = getNextMoves(board, index1, index2);
 		int alpha = std::numeric_limits<int>::min();
 		int beta = std::numeric_limits<int>::max();
@@ -85,7 +87,7 @@ public:
 		std::shuffle(nextMoves.begin(), nextMoves.end(), gen);
 		uint8_t bestMove = 250;
 		if (max) {
-			for (const auto&move : nextMoves) {
+			for (const auto& move : nextMoves) {
 				board[move] = 1;
 				int value = minimaxHelper(board, !max, alpha, beta, depth - 1, move);
 				if (alpha < value) {
@@ -128,7 +130,7 @@ public:
 				break;
 			}
 		}
-		for (int i = - 1; (i + col) >= 0; --i) {
+		for (int i = -1; (i + col) >= 0; --i) {
 			if (board[index + i] == type) {
 				++count;
 			}
@@ -148,7 +150,7 @@ public:
 				break;
 			}
 		}
-		for (int i = - 1; (i + row) >= 0; --i) {
+		for (int i = -1; (i + row) >= 0; --i) {
 			if (board[index + i * SQRT_PIECE_NUM] == type) {
 				++count;
 			}
@@ -247,8 +249,6 @@ public:
 		return evaluateHelper(board, 1) + evaluateHelper(board, -1);
 	}
 
-
-private:
 	static int minimaxHelper(Board& board, bool max, int alpha, int beta, int depth, uint8_t lastAction) {
 		if (depth <= 0 || isOver(board, lastAction))
 			return evaluate(board);
@@ -290,6 +290,7 @@ private:
 		};
 		return scoreBoard[std::min(length, int8_t(5))][closedCount];
 	}
+
 	inline static int scoreHelper(int8_t cur, int8_t type, int8_t& closedCounter, int8_t& stoneCounter) {
 		int score = 0;
 		if (cur == type) {

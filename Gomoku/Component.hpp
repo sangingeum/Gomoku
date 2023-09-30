@@ -65,3 +65,21 @@ struct CListener {
 		}
 	}
 };
+
+
+struct CText {
+	std::reference_wrapper<sf::Text> text;
+	sf::RenderStates state;
+	CText(float x, float y, sf::Text& text_)
+		: text(text_)
+	{
+		state.transform.translate({ x, y });
+	}
+};
+
+struct CToRemove {
+	int count;
+	CToRemove(int count_ = 0)
+		: count(count_)
+	{}
+};
