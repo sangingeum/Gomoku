@@ -225,6 +225,7 @@ void MainScene::reset() {
 		for (entt::entity button : {m_gameResetButton, m_hintButton, m_blackAutoButton, m_whiteAutoButton, m_depthButton}) {
 			auto [cListener, cRenderable] = m_registry.get<CListener, CRenderable>(button);
 			cListener.disabled = false;
+			cListener.toggle = true;
 			cRenderable.vertexArray = m_buttonRect;
 		}
 		m_statusText.setString("Status: Idle");
@@ -271,7 +272,7 @@ sf::VertexArray MainScene::makeCircle(float radius, uint32_t sides, sf::Color co
 }
 
 // Make a vertex array that represents a rectangle 
-sf::VertexArray MainScene::makeRect(float width, float height, sf::Color color, float textCoord) const {
+sf::VertexArray MainScene::makeRect(float width, float height, sf::Color color, float textCoord ) const {
 	sf::VertexArray arr{ sf::PrimitiveType::Quads, 4 };
 	arr[0].position = { 0, 0 };
 	arr[1].position = { width, 0 };

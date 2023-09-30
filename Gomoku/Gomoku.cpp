@@ -267,11 +267,10 @@ int Gomoku::minimaxHelper(Board& board, bool max, int alpha, int beta, int depth
 int Gomoku::calculateScore(int8_t length, int8_t closedCount) {
 	static int scoreBoard[6][3] = {
 		{0, 0, 0},
-		{3, 1, 0},
-		{40, 30, 0},
-		{400, 60, 0},
-		{1500, 200, 0},
-		{100000, 100000, 100000}
+		{0, 0, 0},
+		{40, 30, 30},
+		{400, 60, 60},
+		{1500, 300, 300},
 	};
 	return scoreBoard[std::min(length, int8_t(5))][closedCount];
 }

@@ -9,6 +9,7 @@
 
 #define PIECE_NUM 196
 #define SQRT_PIECE_NUM 14
+#define GAMMA 0.95f
 
 class Gomoku
 {
@@ -32,7 +33,7 @@ private:
 	static uint8_t minimax(Board board, bool max, int depth, uint8_t index1, uint8_t index2);
 	static int isOver(const Board& board, uint8_t index);
 	static std::vector<uint8_t> getNextMoves(const Board& board);
-	static std::vector<uint8_t> getNextMoves(const Board& board, uint8_t index1, uint8_t index2, uint8_t maxLen = 5);
+	static std::vector<uint8_t> getNextMoves(const Board& board, uint8_t index1, uint8_t index2, uint8_t maxLen = 3);
 	static int evaluate(const Board& board);
 	static int minimaxHelper(Board& board, bool max, int alpha, int beta, int depth, uint8_t lastAction);
 	static int calculateScore(int8_t length, int8_t closedCount);
